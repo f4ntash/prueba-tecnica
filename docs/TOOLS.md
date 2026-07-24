@@ -17,7 +17,7 @@ Lo use para:
 - documentar el proceso;
 - mantener una forma de trabajo incremental.
 
-Tambien fue un apoyo para bajar ansiedad y concentrarme en resolver cada etapa de manera ordenada. No lo use como reemplazo de revision: las salidas se contrastaron con tests, con los PDFs reales y con inspeccion manual.
+Tambien me ayudo a mantener una forma de trabajo ordenada, enfocada y sostenida durante toda la resolucion. No lo use como reemplazo de revision: las salidas se contrastaron con tests, con los PDFs reales y con inspeccion manual.
 
 ## Codex
 
