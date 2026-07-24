@@ -70,7 +70,8 @@ La entrega incluye documentacion del proceso porque una parte central de la reso
 Requisitos:
 
 - Python 3.11 o superior
-- Windows PowerShell
+
+Los comandos de instalacion y ejecucion de este README estan escritos para Windows PowerShell. En Linux o macOS solo cambia el comando de activacion del entorno virtual.
 
 Crear y activar entorno virtual:
 
@@ -199,6 +200,16 @@ Estas son evoluciones posibles, no funcionalidades actuales:
 - Revision humana para campos ambiguos.
 - Parser hibrido con LLM para formatos desconocidos.
 - Soporte para nuevos tipos de documentos medicos.
+
+### Integracion en un flujo productivo
+
+La logica actual esta separada de la CLI, por lo que podria exponerse mediante una API HTTP, un proceso batch o un consumidor de eventos sin modificar los parsers. En un escenario real, el sistema podria recibir documentos desde un CRM, ERP o canal de atencion y devolver el resultado estructurado junto con sus warnings.
+
+Antes de definir esa integracion seria necesario conocer el volumen esperado, los tiempos de respuesta requeridos, las politicas de privacidad y que campos necesitan validacion humana.
+
+### Validacion en produccion
+
+La capacidad de automatizacion no deberia estimarse sin una muestra representativa de documentos reales. El siguiente paso seria evaluar el sistema con documentos anonimizados, medir precision por campo y definir que resultados pueden continuar automaticamente y cuales requieren revision humana.
 
 ## Conclusion
 
