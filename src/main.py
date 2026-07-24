@@ -4,6 +4,7 @@ from pathlib import Path
 
 from src.classifier import DocumentType, classify_document
 from src.extractor import EmptyPdfTextError, PdfExtractionError, extract_text
+from src.parsers.authorization import AuthorizationParseError, MedicationAuthorizationParser
 from src.parsers.prescription import DocumentParseError, PrescriptionParser
 
 
@@ -32,8 +33,9 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if document_type == DocumentType.MEDICATION_AUTHORIZATION:
-            print("Error: el parser de autorizaciones todavia no esta implementado.", file=sys.stderr)
-            return 1
+            medical_document = MedicationAuthorizationParser().parse(text)
+            print(medical_document.model_dump_json(indent=2))
+            return 0
 
         print("Error: no se reconoce el tipo de documento.", file=sys.stderr)
         return 1
@@ -42,6 +44,7 @@ def main(argv: list[str] | None = None) -> int:
         ValueError,
         EmptyPdfTextError,
         PdfExtractionError,
+        AuthorizationParseError,
         DocumentParseError,
     ) as exc:
         print(f"Error: {exc}", file=sys.stderr)

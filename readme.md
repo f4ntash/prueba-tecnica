@@ -1,6 +1,6 @@
 # Lector de recetas medicas digitales
 
-Proyecto incremental en Python para leer documentos medicos digitales en PDF, extraer texto nativo, detectar el tipo de documento y estructurar recetas tradicionales como JSON validado con Pydantic.
+Proyecto incremental en Python para leer documentos medicos digitales en PDF, extraer texto nativo, detectar el tipo de documento y estructurar recetas tradicionales y autorizaciones de medicamentos como JSON validado con Pydantic.
 
 La idea central es separar extraccion, clasificacion e interpretacion. El problema no es solamente sacar texto de un PDF, sino convertir documentos medicos heterogeneos en una estructura comun sin inventar datos.
 
@@ -11,6 +11,7 @@ Implementado:
 - extraccion nativa de PDF con PyMuPDF;
 - clasificacion deterministica de `prescription`, `medication_authorization` y `unknown`;
 - parser de receta tradicional;
+- parser de autorizacion de medicamentos;
 - modelos Pydantic;
 - CLI con salida JSON;
 - warnings para campos invalidos o inciertos;
@@ -18,7 +19,6 @@ Implementado:
 
 Pendiente:
 
-- parser de autorizaciones;
 - OCR para PDFs escaneados;
 - uso de LLMs para formatos desconocidos;
 - multiples medicamentos por receta;
@@ -42,16 +42,27 @@ tests/
   test_classifier.py
   test_extractor.py
   test_prescription_parser.py
+  test_authorization_parser.py
 
 docs/
   DECISIONS.md
+  DEVELOPMENT_LOG.md
+  TOOLS.md
 ```
 
 ## Proceso de Resolucion
 
 La bitacora tecnica con las decisiones reales tomadas durante la implementacion esta en [docs/DECISIONS.md](docs/DECISIONS.md).
 
-Ahi se documenta, entre otras cosas, por que `Fecha de vigencia` no se usa como vencimiento de receta, como se maneja el CUIL invalido y que paso con el caso visual `1/d�a`.
+Ahi se documenta, entre otras cosas, por que `Fecha de vigencia` no se usa como vencimiento de receta, como se reconstruye la tabla de autorizacion, como se maneja el CUIL invalido y que paso con el caso visual `1/día`.
+
+## Proceso y Herramientas
+
+La entrega incluye documentacion del proceso porque una parte central de la resolucion fue observar, formular hipotesis, validar resultados y corregir interpretaciones, ademas de escribir el codigo.
+
+- [Bitacora de desarrollo](docs/DEVELOPMENT_LOG.md)
+- [Decisiones tecnicas](docs/DECISIONS.md)
+- [Herramientas utilizadas](docs/TOOLS.md)
 
 ## Instalacion
 
@@ -115,11 +126,13 @@ Salida conceptual:
 }
 ```
 
-Si el documento es una autorizacion, hoy se clasifica pero no se parsea:
+Ejecutar con una autorizacion:
 
-```text
-Error: el parser de autorizaciones todavia no esta implementado.
+```powershell
+python -m src.main .\2.pdf
 ```
+
+La salida usa la misma estructura `MedicalDocument`, con `document_type` igual a `medication_authorization`.
 
 ## Parser de Recetas
 
@@ -140,6 +153,35 @@ Decisiones actuales:
 - Los campos ausentes o no confiables quedan como `null`.
 - Los reemplazos de texto solo se hacen para patrones conocidos y verificables.
 
+## Warnings
+
+La salida no agrega warnings por cualquier `null`.
+
+- Ausencia esperable de un campo opcional: `null` sin warning.
+- Campo presente pero invalido: `null` o valor conservado con warning.
+- Estructura importante que no se puede reconstruir: warning.
+- Documento incompatible con el parser: excepcion y mensaje claro.
+
+## Parser de Autorizaciones
+
+El parser de autorizaciones trabaja sobre una tabla que PyMuPDF extrae como una secuencia de lineas. Usa encabezados como `NOMBRE COMERCIAL`, `MONODROGA`, `COBERT.` y `CANT. AUT.`, y corta el bloque al llegar a `MEDICO SOLICITANTE`.
+
+Extrae:
+
+- paciente desde `AFILIADO:`, usando delimitadores como `OBLIG.`, `IVA`, `PLAN:`, `EDAD:` o `EMP.:`;
+- profesional desde `MEDICO SOLICITANTE:`;
+- diagnostico desde `DIAGNOSTICO:`, prefiriendo la descripcion cuando hay codigo;
+- fecha de autorizacion/emision como `issued_at`;
+- `AUTORIZACION VALIDA HASTA EL` como `valid_until`;
+- medicamento autorizado: nombre comercial, monodroga, dosis, presentacion, cobertura y cantidad.
+
+Limitaciones del parseo tabular:
+
+- asume que la fila de medicamento queda como secuencia: codigo, nombre comercial, monodroga, cobertura y cantidad;
+- soporta el caso observado y textos sinteticos similares, incluyendo mas de una fila simple;
+- no cubre tablas complejas con celdas largas partidas de forma ambigua;
+- si no puede reconstruir una fila con confianza, devuelve menos datos y agrega warnings.
+
 ## Tests
 
 ```powershell
@@ -150,18 +192,17 @@ Los tests no dependen de los PDFs reales para cubrir la logica principal. Usan t
 
 ## Limitaciones
 
-- Solo hay parser para receta tradicional.
-- No interpreta tablas.
+- Los parsers cubren los formatos observados, no todos los formatos posibles.
+- El parseo tabular de autorizaciones es heuristico.
 - No usa OCR.
 - No usa LLMs.
-- Soporta un medicamento principal.
+- Soporta filas simples de medicamentos; los casos tabulares complejos siguen siendo limitados.
 - No hace validacion clinica ni normalizacion farmacologica.
 - En produccion no deberian registrarse datos medicos sensibles en logs.
 
 ## Proximos Pasos
 
-- Implementar `MedicationAuthorizationParser`.
-- Soportar multiples medicamentos.
+- Fortalecer multiples medicamentos con tablas mas variables.
 - Evaluar si corresponde agregar `suggested_brand`.
 - Incorporar OCR como fallback para documentos escaneados.
 - Evaluar LLMs solo para formatos desconocidos, con salida validada y controles de privacidad.

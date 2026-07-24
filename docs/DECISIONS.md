@@ -98,13 +98,51 @@ Uso `null` cuando un dato no aparece o no se puede afirmar con confianza. Ejempl
 
 Los warnings comunican incertidumbre sin romper todo el parseo. Hoy se usan para campos importantes faltantes, fechas invalidas, CUIL invalido y texto danado no corregible.
 
-## 10. Estado actual
+La regla que quedo en el proyecto es esta:
+
+- ausencia esperable de un campo opcional: `null` sin warning;
+- campo presente pero invalido: `null` o valor conservado con warning;
+- estructura importante que no puede reconstruirse: warning;
+- documento incompatible con el parser: excepcion.
+
+## 10. Implementacion de autorizaciones
+
+Despues de dejar estable la receta, implemente `MedicationAuthorizationParser` usando `2.pdf` como validacion manual.
+
+Primero inspeccione el texto interno y despues renderice el PDF para mirar la tabla visual. Visualmente hay una fila con columnas: codigo, nombre comercial, monodroga, cobertura y cantidad autorizada. En el texto interno, PyMuPDF lo entrega como lineas consecutivas:
+
+- encabezados separados: `CODIGO`, `NOMBRE COMERCIAL`, `MONODROGA`, `COBERT.`, `CANT. AUT.`;
+- luego una secuencia de valores: codigo, nombre comercial con dosis/presentacion, monodroga, porcentaje y cantidad;
+- despues aparecen `MEDICO SOLICITANTE` y `DIAGNOSTICO`.
+
+La hipotesis fue reconstruir la fila con esos limites: empezar despues de `CANT. AUT.`, cortar en `MEDICO SOLICITANTE`, detectar el codigo con un patron tipo `numero - numero`, detectar cobertura por `%` y cantidad como numero.
+
+Al probar con `2.pdf`, esa estrategia alcanzo para extraer el medicamento sin hardcodear valores. Tambien confirme dos decisiones semanticas:
+
+- `Fecha de Autorizacion` es la mejor candidata para `issued_at`;
+- `Fecha de Auditoria` existe, pero no representa emision ni validez;
+- `AUTORIZACION VALIDA HASTA EL` corresponde a `valid_until`.
+
+Para el paciente, la linea `AFILIADO:` mezcla numero de afiliado, nombre y condicion impositiva. Por eso el parser corta el nombre usando delimitadores como `OBLIG.`, `IVA`, `PLAN:`, `EDAD:` o `EMP.:`. Si no aparece un delimitador claro, devuelve `null` y warning.
+
+`DNI Afiliado` aparece vacio en `2.pdf`; queda `null` sin inventar un DNI.
+
+Antes de cerrar esta etapa, revise algunos bordes del parser:
+
+- el nombre del profesional salia como `MEDICO MEDICO.` y se normalizo quitando solo puntuacion final evidente, sin tocar puntos internos como iniciales;
+- los encabezados repetidos dentro de la tabla se ignoran;
+- una fila incompleta agrega warning y no impide parsear la siguiente;
+- la cobertura se valida entre 0 y 100;
+- la cantidad se toma solo despues de la cobertura, para no confundirla con codigo de producto ni porcentaje.
+
+## 11. Estado actual
 
 Implementado:
 
 - extraccion nativa con PyMuPDF;
 - clasificacion deterministica;
 - parser de receta tradicional;
+- parser de autorizacion de medicamentos;
 - modelos Pydantic;
 - CLI con JSON;
 - warnings;
@@ -112,26 +150,25 @@ Implementado:
 
 Todavia no implementado:
 
-- parser de autorizaciones;
 - OCR;
 - LLM;
 - niveles de confianza;
 - revision humana;
 - almacenamiento de evidencia por campo.
 
-## 11. Riesgos y siguientes pasos
+## 12. Riesgos y siguientes pasos
 
-La solucion actual funciona para la receta observada, pero todavia es limitada:
+La solucion actual funciona para los dos formatos observados, pero todavia es limitada:
 
-- soporta un medicamento principal;
-- no interpreta tablas;
+- soporta filas simples de medicamentos, incluso mas de una;
+- reconstruye la tabla de autorizacion con heuristicas simples;
 - depende de etiquetas conocidas;
 - no normaliza medicamentos contra un catalogo;
 - no debe registrar datos medicos sensibles en produccion.
 
-El siguiente paso natural seria implementar el parser de autorizaciones con reglas pensadas para tablas. Despues, OCR podria entrar solo como fallback cuando la extraccion nativa no devuelva texto suficiente.
+El siguiente paso natural seria soportar multiples medicamentos y mas variantes de tabla. Despues, OCR podria entrar solo como fallback cuando la extraccion nativa no devuelva texto suficiente.
 
-## 12. Relacion con sistemas de IA
+## 13. Relacion con sistemas de IA
 
 Esta prueba toca problemas que tambien aparecen al construir sistemas con IA: no inventar campos ausentes, validar salidas estructuradas, separar extraccion de interpretacion y hacer visible la incertidumbre.
 
